@@ -114,3 +114,41 @@ class TrainTrip(Trip):
                  train_number: str = "R999"):
         super().__init__(trip_id, "subway", from_city, to_city, departure_time, price_per_seat)
         self.train_number = train_number
+
+class Booking: #????
+    def __init__(self, booking_id: str, passenger: Passenger, trip: Trip, seats: List[int], total_price: float, passenger_types: Dict[str, int]={"adult":1}):
+        self.booking_id = booking_id
+        self.passenger = passenger
+        self.trip = trip
+        self.seats = seats
+        self.passenger_types = passenger_types
+        self.total_price = total_price
+        self.status = "confirmed"
+        self.booking_time = datetime.now()
+
+    def calculate_price(self, base_price: float) -> float:
+        price = 0
+        price += self.passenger_types.get('adult', 0) * base_price
+        price += self.passenger_types.get('child', 0) * base_price * 0.5
+        price += self.passenger_types.get('baby', 0) * base_price * 0.1
+        return price
+
+    def can_cancel(self, current_time: datetime) -> tuple[bool, str]:
+        if self.status != "confirmed":
+            return False, "it has been canceled already"
+        time_to_departure = self.trip.departure_time - current_time
+        if time_to_departure < timedelta(hours=24):
+            return False, "u can cancel only 24 hrs before departure"
+        return True, "acceptable canceling"
+
+    def cancel(self, system: 'TravelSystem', current_time: datetime) -> tuple[bool, str]:
+        can, msg = self.can_cancel(current_time)
+        if not can:
+            return False, msg
+        self.trip.cancel_seats(self.seats)
+        self.status = "cancelled"
+        refund = self.total_price * 0.8
+        self.passenger.wallet.deposit(refund)
+        self.passenger.history.remove(self) if self in self.passenger.history else None
+        system.bookings.remove(self)
+        return True, f"your reserved has been canceled and {refund}$ deposited to your wallet"
